@@ -14,6 +14,9 @@ export function registerAnalyticsTools(server: MCPServer) {
       description: "Get the recent history of prompts and transactions I've sent you to see my trading patterns.",
       schema: z.object({}),
       annotations: { readOnlyHint: true },
+      widget: {
+        name: "usage-history",
+      },
     },
     async () => {
       if (!supabase) {

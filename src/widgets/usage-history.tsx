@@ -1,11 +1,20 @@
+import { z } from "zod";
+
+const propsSchema = z.object({
+  transactions: z.array(z.object({
+    id: z.string(),
+    action_type: z.string(),
+    timestamp: z.string()
+  }))
+});
+
 export const widgetMetadata = {
   description: "Displays the user's recent Liquid trading prompts and activity",
+  props: propsSchema,
   exposeAsTool: false,
 };
 
-type Props = {
-  transactions: { id: string; action_type: string; timestamp: string }[];
-};
+type Props = z.infer<typeof propsSchema>;
 
 export default function UsageHistory({ transactions }: Props) {
   // Wait for React to be available globally in context
