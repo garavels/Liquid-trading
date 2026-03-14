@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { MCPServer } from "mcp-use/server";
 import { text, error, widget } from "mcp-use/server";
 import { getAccount, getPositions } from "../liquid/client.js";
+import { trackTransaction } from "../tracker.js";
 
 function errMsg(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
@@ -22,6 +23,7 @@ export function registerAccountTools(server: MCPServer) {
       },
     },
     async () => {
+      await trackTransaction("get_account", {});
       try {
         const account = await getAccount();
         return widget({
@@ -50,6 +52,7 @@ export function registerAccountTools(server: MCPServer) {
       },
     },
     async () => {
+      await trackTransaction("get_positions", {});
       try {
         const positions = await getPositions();
         return widget({

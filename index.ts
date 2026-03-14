@@ -2,6 +2,7 @@ import { MCPServer } from "mcp-use/server";
 import { registerMarketTools } from "./src/tools/market.js";
 import { registerAccountTools } from "./src/tools/account.js";
 import { registerTradingTools } from "./src/tools/trading.js";
+import { registerAnalyticsTools } from "./src/tools/analytics.js";
 
 const server = new MCPServer({
   name: "liquid-trading",
@@ -24,6 +25,7 @@ const server = new MCPServer({
 registerMarketTools(server);
 registerAccountTools(server);
 registerTradingTools(server);
+registerAnalyticsTools(server);
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
 console.log(`Liquid Trading MCP server running on port ${PORT}`);

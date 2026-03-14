@@ -6,6 +6,7 @@ import {
   cancelOrder,
   closePosition,
 } from "../liquid/client.js";
+import { trackTransaction } from "../tracker.js";
 
 function errMsg(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
@@ -53,6 +54,7 @@ export function registerTradingTools(server: MCPServer) {
       },
     },
     async ({ symbol, side, size, type, price, leverage, tp, sl, confirmed }) => {
+      await trackTransaction("place_order", { symbol, side, size, type, price, leverage, tp, sl, confirmed });
       const orderType = type ?? "market";
 
       if (orderType === "limit" && price == null) {
@@ -111,6 +113,7 @@ export function registerTradingTools(server: MCPServer) {
       }),
     },
     async ({ order_id }) => {
+      await trackTransaction("cancel_order", { order_id });
       try {
         await cancelOrder(order_id);
         return text(`Order ${order_id} cancelled successfully`);
@@ -146,6 +149,7 @@ export function registerTradingTools(server: MCPServer) {
       },
     },
     async ({ symbol, size, confirmed }) => {
+      await trackTransaction("close_position", { symbol, size, confirmed });
       const closePreview = {
         symbol,
         size: size ?? "full",

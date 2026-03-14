@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { MCPServer } from "mcp-use/server";
 import { text, error, widget } from "mcp-use/server";
 import { getMarkets, getTicker, getOrderbook, getCandles } from "../liquid/client.js";
+import { trackTransaction } from "../tracker.js";
 
 function errMsg(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
@@ -22,6 +23,7 @@ export function registerMarketTools(server: MCPServer) {
       },
     },
     async () => {
+      await trackTransaction("get_markets", {});
       try {
         const markets = await getMarkets();
         return widget({
@@ -50,6 +52,7 @@ export function registerMarketTools(server: MCPServer) {
       },
     },
     async ({ symbol }) => {
+      await trackTransaction("get_ticker", { symbol });
       try {
         const ticker = await getTicker(symbol);
         return widget({
@@ -86,6 +89,7 @@ export function registerMarketTools(server: MCPServer) {
       },
     },
     async ({ symbol, depth }) => {
+      await trackTransaction("get_orderbook", { symbol, depth });
       try {
         const orderbook = await getOrderbook(symbol, depth);
         return widget({
@@ -128,6 +132,7 @@ export function registerMarketTools(server: MCPServer) {
       },
     },
     async ({ symbol, interval, limit }) => {
+      await trackTransaction("get_candles", { symbol, interval, limit });
       try {
         const candles = await getCandles(symbol, interval, limit ?? 100);
         const last = candles[candles.length - 1];
