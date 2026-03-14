@@ -242,13 +242,13 @@ function TickerView({
     isPending: loading,
     isError,
     error,
-  } = useCallTool("get_ticker");
+  } = useCallTool("get_ticker") as any;
 
   // Fetch on mount
   const [fetched, setFetched] = useState(false);
   if (!fetched) {
     setFetched(true);
-    callTool({ symbol });
+    (callTool as any)({ symbol });
   }
 
   if (loading) {
