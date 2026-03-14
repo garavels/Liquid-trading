@@ -1,6 +1,8 @@
+import { createHmac, createHash, randomBytes } from "crypto";
+
 const BASE_URL = "https://api-public.liquidmax.xyz/v1";
 
-function getHeaders(): Record<string, string> {
+function getCredentials() {
   const key = process.env.LIQUID_API_KEY;
   const secret = process.env.LIQUID_API_SECRET;
   if (!key || !secret) {
@@ -8,10 +10,81 @@ function getHeaders(): Record<string, string> {
       "Missing LIQUID_API_KEY or LIQUID_API_SECRET environment variables",
     );
   }
+  return { key, secret };
+}
+
+function generateNonce(): string {
+  return randomBytes(16).toString("hex");
+}
+
+function hashBody(body?: string): string {
+  if (!body) return "";
+  return createHash("sha256").update(body).digest("hex");
+}
+
+function sortObjectKeys(obj: unknown): unknown {
+  if (obj === null || typeof obj !== "object") return obj;
+  if (Array.isArray(obj)) return obj.map(sortObjectKeys);
+  const sorted: Record<string, unknown> = {};
+  for (const key of Object.keys(obj as Record<string, unknown>).sort()) {
+    sorted[key] = sortObjectKeys((obj as Record<string, unknown>)[key]);
+  }
+  return sorted;
+}
+
+function signRequest(
+  method: string,
+  path: string,
+  query: string,
+  body?: unknown,
+): Record<string, string> {
+  const { key, secret } = getCredentials();
+  const timestamp = Date.now().toString();
+  const nonce = generateNonce();
+
+  const canonicalMethod = method.toUpperCase();
+  const canonicalPath = path.toLowerCase().replace(/\/+$/, "");
+
+  // Sort query params by key
+  let canonicalQuery = "";
+  if (query) {
+    const params = new URLSearchParams(query);
+    const sorted = [...params.entries()].sort((a, b) =>
+      a[0].localeCompare(b[0]),
+    );
+    canonicalQuery = new URLSearchParams(sorted).toString();
+  }
+
+  // Hash body: sort keys, compact JSON; always SHA256 (empty string when no body)
+  let bodyString: string | undefined;
+  let bodyHash: string;
+  if (body != null && Object.keys(body as Record<string, unknown>).length > 0) {
+    bodyString = JSON.stringify(sortObjectKeys(body));
+    bodyHash = createHash("sha256").update(bodyString).digest("hex");
+  } else {
+    bodyHash = createHash("sha256").update("").digest("hex");
+  }
+
+  const payload = [
+    timestamp,
+    nonce,
+    canonicalMethod,
+    canonicalPath,
+    canonicalQuery,
+    bodyHash,
+  ].join("\n");
+
+  const signature = createHmac("sha256", secret)
+    .update(payload)
+    .digest("hex");
+
   return {
-    "X-API-Key": key,
-    "X-API-Secret": secret,
+    "X-Liquid-Key": key,
+    "X-Liquid-Timestamp": timestamp,
+    "X-Liquid-Nonce": nonce,
+    "X-Liquid-Signature": signature,
     "Content-Type": "application/json",
+    ...(bodyString != null && { _body: bodyString }),
   };
 }
 
@@ -20,26 +93,35 @@ async function request<T>(
   path: string,
   body?: unknown,
 ): Promise<T> {
-  const url = `${BASE_URL}${path}`;
+  // Split path and query
+  const [pathname, queryString] = path.split("?");
+  const fullPath = `/v1${pathname}`;
+  const signed = signRequest(method, fullPath, queryString ?? "", body);
+
+  // Extract the serialized body (with sorted keys) from the sign step
+  const serializedBody = signed._body;
+  delete signed._body;
+
+  const url = `${BASE_URL}${pathname}${queryString ? `?${queryString}` : ""}`;
   const res = await fetch(url, {
     method,
-    headers: getHeaders(),
-    body: body ? JSON.stringify(body) : undefined,
+    headers: signed,
+    body: serializedBody ?? undefined,
   });
 
-  if (!res.ok) {
-    let message: string;
-    try {
-      const err = (await res.json()) as { message?: string; error?: string };
-      message = err.message || err.error || res.statusText;
-    } catch {
-      message = res.statusText;
-    }
+  const json = (await res.json()) as {
+    success: boolean;
+    data: T;
+    error?: { code?: string; message?: string };
+  };
+
+  if (!res.ok || !json.success) {
+    const message =
+      json.error?.message || json.error?.code || res.statusText;
     throw new Error(`Liquid API ${res.status}: ${message}`);
   }
 
-  if (res.status === 204) return undefined as T;
-  return res.json() as Promise<T>;
+  return json.data;
 }
 
 // ---- Types ----
@@ -132,7 +214,10 @@ export async function getMarkets(): Promise<Market[]> {
 }
 
 export async function getTicker(symbol: string): Promise<Ticker> {
-  return request<Ticker>("GET", `/markets/${encodeURIComponent(symbol)}/ticker`);
+  return request<Ticker>(
+    "GET",
+    `/markets/${encodeURIComponent(symbol)}/ticker`,
+  );
 }
 
 export async function getOrderbook(
