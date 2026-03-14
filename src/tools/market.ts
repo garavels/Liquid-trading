@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { MCPServer } from "mcp-use/server";
 import { text, error, widget } from "mcp-use/server";
-import { getMarkets, getTicker, getOrderbook } from "../liquid/client.js";
+import { getMarkets, getTicker, getOrderbook, getCandles } from "../liquid/client.js";
 
 function errMsg(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
@@ -98,6 +98,53 @@ export function registerMarketTools(server: MCPServer) {
         return error(
           `Failed to fetch order book for ${symbol}: ${errMsg(err)}`,
         );
+      }
+    },
+  );
+
+  server.tool(
+    {
+      name: "get_candles",
+      description:
+        "Get OHLCV candlestick chart data for a symbol and render it as an interactive price chart",
+      schema: z.object({
+        symbol: z.string().describe("Market symbol, e.g. BTC-PERP"),
+        interval: z
+          .enum(["1m", "5m", "15m", "30m", "1h", "4h", "1d"])
+          .describe("Candle interval"),
+        limit: z
+          .number()
+          .int()
+          .min(1)
+          .max(200)
+          .optional()
+          .describe("Number of candles to fetch (default 100, max 200)"),
+      }),
+      annotations: { readOnlyHint: true },
+      widget: {
+        name: "price-chart",
+        invoking: "Loading chart...",
+        invoked: "Chart loaded",
+      },
+    },
+    async ({ symbol, interval, limit }) => {
+      try {
+        const candles = await getCandles(symbol, interval, limit ?? 100);
+        const last = candles[candles.length - 1];
+        const first = candles[0];
+        const lastClose = parseFloat(last?.close ?? "0");
+        const firstOpen = parseFloat(first?.open ?? "0");
+        const changePct = firstOpen > 0
+          ? (((lastClose - firstOpen) / firstOpen) * 100).toFixed(2)
+          : "0.00";
+        return widget({
+          props: { symbol, interval, candles },
+          output: text(
+            `${symbol} ${interval} chart: ${candles.length} candles, last close: $${lastClose.toLocaleString()} (${changePct}%)`,
+          ),
+        });
+      } catch (err) {
+        return error(`Failed to fetch candles for ${symbol}: ${errMsg(err)}`);
       }
     },
   );

@@ -43,7 +43,7 @@ function signRequest(
   const nonce = generateNonce();
 
   const canonicalMethod = method.toUpperCase();
-  const canonicalPath = path.toLowerCase().replace(/\/+$/, "");
+  const canonicalPath = decodeURIComponent(path).toLowerCase().replace(/\/+$/, "");
 
   // Sort query params by key
   let canonicalQuery = "";
@@ -207,6 +207,15 @@ export interface ClosePositionResponse {
   message: string;
 }
 
+export interface Candle {
+  timestamp: number;
+  open: string;
+  high: string;
+  low: string;
+  close: string;
+  volume: string;
+}
+
 // ---- Client methods ----
 
 export async function getMarkets(): Promise<Market[]> {
@@ -254,6 +263,23 @@ export async function placeOrder(params: PlaceOrderParams): Promise<Order> {
 
 export async function cancelOrder(orderId: string): Promise<void> {
   return request<void>("DELETE", `/orders/${encodeURIComponent(orderId)}`);
+}
+
+export async function getCandles(
+  symbol: string,
+  interval: string,
+  limit?: number,
+  start?: number,
+  end?: number,
+): Promise<Candle[]> {
+  const params = new URLSearchParams({ interval });
+  if (limit != null) params.set("limit", limit.toString());
+  if (start != null) params.set("start", start.toString());
+  if (end != null) params.set("end", end.toString());
+  return request<Candle[]>(
+    "GET",
+    `/markets/${encodeURIComponent(symbol)}/candles?${params.toString()}`,
+  );
 }
 
 export async function closePosition(
