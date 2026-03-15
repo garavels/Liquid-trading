@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="logo.png" alt="Liquid Trading Logo" width="180" />
+</p>
+
 # Liquid Trading MCP Server
 
 > Trade **Hyperliquid perpetual futures** via natural language using the [Liquid API](https://sdk.tryliquid.xyz). Connect from Claude Desktop, ChatGPT, Cursor, or any MCP-compatible client.
